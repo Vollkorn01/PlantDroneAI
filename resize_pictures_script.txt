@@ -1,0 +1,1 @@
+mogrify -path "/Users/alexander/Documents/DevProjects/PlantDroneAI/data_224x224/train/other/" -resize 224x224^ -gravity Center -extent 224x224 "/Users/alexander/Documents/DevProjects/PlantDroneAI/data_orig/train/other/*.jpg"

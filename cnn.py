@@ -12,11 +12,12 @@
 # Part 1 - Building the CNN
 
 # Importing the Keras libraries and packages
-from keras.models import Sequential
-from keras.layers import Convolution2D
-from keras.layers import MaxPooling2D
-from keras.layers import Flatten
-from keras.layers import Dense
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Convolution2D
+from tensorflow.keras.layers import MaxPooling2D
+from tensorflow.keras.layers import Flatten
+from tensorflow.keras.layers import Dense
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
 
 # %%
 
@@ -45,7 +46,7 @@ classifier.compile(optimizer = 'adam', loss = 'binary_crossentropy', metrics = [
 
 # Part 2 - Fitting the CNN to the images
 
-#from keras.preprocessing.image import ImageDataGenerator, array_to_img, img_to_array, load_img
+#from tensorflow.keras.preprocessing.image import ImageDataGenerator, array_to_img, img_to_array, load_img
 
 
 train_datagen = ImageDataGenerator(rescale = 1./255,
@@ -72,7 +73,7 @@ classifier.fit_generator(training_set,
                          nb_val_samples = 2000)
 
 # %%
-from keras.preprocessing.image import ImageDataGenerator, array_to_img, img_to_array, load_img
+from tensorflow.keras.preprocessing.image import ImageDataGenerator, array_to_img, img_to_array, load_img
 
 datagen = ImageDataGenerator(
         rotation_range=40,
@@ -82,7 +83,6 @@ datagen = ImageDataGenerator(
         zoom_range=0.2,
         horizontal_flip=True,
         fill_mode='nearest')
-
 img = load_img('images_bitter_dock/0_bitter_dock.jpg')  # this is a PIL image
 x = img_to_array(img)  # this is a Numpy array with shape (3, 150, 150)
 # x = x.reshape((3, 2048, 1536))  # this is a Numpy array with shape (1, 3, 150, 150)
@@ -99,14 +99,14 @@ for batch in datagen.flow(x, batch_size=1,
         break  # otherwise the generator would loop indefinitely
 
 
-# %%
+# %% CNN 4 layers model
 
-from keras.preprocessing.image import ImageDataGenerator, img_to_array, load_img
-from keras.models import Sequential
-from keras.layers import Conv2D, MaxPooling2D
-from keras.layers import Activation, Dropout, Flatten, Dense
-from keras import backend as K
-from keras.callbacks import ModelCheckpoint
+from tensorflow.keras.preprocessing.image import ImageDataGenerator, img_to_array, load_img
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Conv2D, MaxPooling2D
+from tensorflow.keras.layers import Activation, Dropout, Flatten, Dense
+from tensorflow.keras import backend as K
+from tensorflow.keras.callbacks import ModelCheckpoint
 
 from tensorflow.python.client import device_lib
 def get_available_devices():
@@ -115,13 +115,13 @@ def get_available_devices():
 print(get_available_devices()) 
 
 # dimensions of our images.
-img_width, img_height = 150, 150
-
-train_data_dir = 'data/train'
-validation_data_dir = 'data/validation'
-nb_train_samples = 2192
-nb_validation_samples = 800
-epochs = 50
+img_width, img_height = 100, 178
+data_dir = 'data_100_small'
+train_data_dir = data_dir + '/train'
+validation_data_dir = data_dir + '/validation'
+nb_train_samples = 18304
+nb_validation_samples = 7827
+epochs = 100
 batch_size = 16
 
 if K.image_data_format() == 'channels_first':
@@ -134,15 +134,19 @@ model.add(Conv2D(32, (3, 3), input_shape=input_shape))
 model.add(Activation('relu'))
 model.add(MaxPooling2D(pool_size=(2, 2)))
 
-model.add(Conv2D(32, (3, 3)))
-model.add(Activation('relu'))
+model.add(Conv2D(32, kernel_size=(3, 3), activation='relu'))
+
+model.add(Conv2D(64, kernel_size=(3, 3), activation='relu'))
 model.add(MaxPooling2D(pool_size=(2, 2)))
 
-model.add(Conv2D(64, (3, 3)))
-model.add(Activation('relu'))
-model.add(MaxPooling2D(pool_size=(2, 2)))
+model.add(Conv2D(128, kernel_size=(3, 3), activation='relu'))
 
 model.add(Flatten())
+
+model.add(Dense(512, activation='relu'))
+
+model.add(Dense(128, activation='relu'))
+
 model.add(Dense(64))
 model.add(Activation('relu'))
 model.add(Dropout(0.5))
@@ -150,19 +154,15 @@ model.add(Dense(1))
 model.add(Activation('sigmoid'))
 
 model.compile(loss='binary_crossentropy',
-              optimizer='rmsprop',
+              optimizer='adam',
               metrics=['accuracy'])
 
 # this is the augmentation configuration we will use for training
-train_datagen = ImageDataGenerator(
-    rescale=1. / 255,
-    shear_range=0.2,
-    zoom_range=0.2,
-    horizontal_flip=True)
+train_datagen = ImageDataGenerator()
 
 # this is the augmentation configuration we will use for testing:
 # only rescaling
-test_datagen = ImageDataGenerator(rescale=1. / 255)
+test_datagen = ImageDataGenerator()
 
 train_generator = train_datagen.flow_from_directory(
     train_data_dir,
@@ -190,9 +190,114 @@ history = model.fit_generator(
     validation_data=validation_generator,
     validation_steps=nb_validation_samples // batch_size)
 
+#%% Transfer learning VGG-16 - import
 
-#%%
-from keras.preprocessing.image import ImageDataGenerator, img_to_array, load_img
+from tensorflow.keras.preprocessing.image import ImageDataGenerator, img_to_array, load_img
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Conv2D, MaxPooling2D
+from tensorflow.keras.layers import Activation, Dropout, Flatten, Dense
+from tensorflow.keras import backend as K
+from tensorflow.keras.callbacks import ModelCheckpoint
+from tensorflow.keras import applications
+
+# dimensions of our images.
+img_width, img_height = 224, 224
+data_dir = 'data_224x224'
+train_data_dir = data_dir + '/train'
+validation_data_dir = data_dir + '/validation'
+nb_train_samples = 36640
+nb_validation_samples = 15664
+epochs = 25
+batch_size = 16
+
+if K.image_data_format() == 'channels_first':
+    input_shape = (3, img_width, img_height)
+else:
+    input_shape = (img_width, img_height, 3)
+
+vgg_model = applications.VGG16(weights='imagenet', include_top=True)
+
+# To see the models' architecture and layer names, run the following
+vgg_model.summary()
+
+#%% Transfer learning VGG-16 - designing
+
+#vgg_model = applications.VGG16(weights='imagenet',
+#                               include_top=True,
+#                               input_shape=(100, 178, 3))
+
+# Creating dictionary that maps layer names to the layers
+layer_dict = dict([(layer.name, layer) for layer in vgg_model.layers])
+
+# Getting output tensor of the last VGG layer that we want to include
+x = layer_dict['block3_pool'].output
+
+# Stacking a new simple convolutional network on top of it    
+x = Conv2D(filters=512, kernel_size=(3, 3), activation='relu', padding="same")(x)
+x = Conv2D(filters=512, kernel_size=(3, 3), activation='relu', padding="same")(x)
+x = Conv2D(filters=512, kernel_size=(3, 3), activation='relu', padding="same")(x)
+x = MaxPooling2D(pool_size=(2, 2))(x)
+x = Conv2D(filters=512, kernel_size=(3, 3), activation='relu', padding="same")(x)
+x = Conv2D(filters=512, kernel_size=(3, 3), activation='relu', padding="same")(x)
+x = Conv2D(filters=512, kernel_size=(3, 3), activation='relu', padding="same")(x)
+x = MaxPooling2D(pool_size=(2, 2))(x)
+x = Flatten()(x)
+x = Dense(units=4096,activation="relu")(x)
+x = Dense(units=4096,activation="relu")(x)
+#x = Dense(64, activation='relu')(x)
+#x = Dropout(0.5)(x)
+x = Dense(1, activation='sigmoid')(x)
+
+# Creating new model. Please note that this is NOT a Sequential() model.
+from tensorflow.keras.models import Model
+custom_model = Model(inputs=vgg_model.input, outputs=x)
+
+# Make sure that the pre-trained bottom layers are not trainable
+for layer in custom_model.layers[:11]:
+    layer.trainable = False
+
+# Do not forget to compile it
+custom_model.compile(loss='binary_crossentropy',
+                     optimizer='adam',
+                     metrics=['accuracy'])
+custom_model.summary()
+
+#%% Transfer learning VGG-16 - training
+
+from tensorflow.keras.callbacks import ModelCheckpoint, EarlyStopping
+
+# this is the augmentation configuration we will use for training
+train_datagen = ImageDataGenerator()
+
+# this is the augmentation configuration we will use for testing:
+# only rescaling
+test_datagen = ImageDataGenerator()
+
+train_generator = train_datagen.flow_from_directory(
+    train_data_dir,
+    target_size=(img_width, img_height),
+    batch_size=batch_size,
+    class_mode='binary')
+
+validation_generator = test_datagen.flow_from_directory(
+    validation_data_dir,
+    target_size=(img_width, img_height),
+    batch_size=batch_size,
+    class_mode='binary')
+
+
+checkpoint = ModelCheckpoint("vgg16_1.h5", monitor='val_acc', verbose=1, save_best_only=True, save_weights_only=False, mode='auto', period=1)
+early = EarlyStopping(monitor='val_acc', min_delta=0, patience=20, verbose=1, mode='auto')
+hist = custom_model.fit_generator(train_generator,
+                                  steps_per_epoch=nb_train_samples // batch_size,
+                                  validation_data= validation_generator,
+                                  validation_steps=nb_validation_samples // batch_size,
+                                  epochs=100,
+                                  callbacks=[checkpoint,early])
+
+
+#%% Prediction
+from tensorflow.keras.preprocessing.image import ImageDataGenerator, img_to_array, load_img
 import matplotlib.pyplot as plt
 import glob
 from PIL import Image
